@@ -19,8 +19,12 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Setup Git
-      uses: actions/setup-git@v1
+    - name: Configure Git (optional)
+      run: |
+        git config --system core.longpaths true
+        # 你可以根据需要添加下面两行
+        # git config --global user.name "Your Name"
+        # git config --global user.email "you@example.com"
 
     - name: Install Dependencies
       shell: bash
@@ -29,8 +33,6 @@ jobs:
     - name: Fetch and Build Skia (official method)
       shell: bash
       run: |
-        git config --system core.longpaths true
-
         echo "Cloning depot_tools..."
         git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
         echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
@@ -47,11 +49,11 @@ jobs:
     - name: Configure Aseprite with CMake
       shell: bash
       run: |
-        cmake -S . -B build -G Ninja ^
-          -DCMAKE_BUILD_TYPE=Release ^
-          -DLAF_BACKEND=skia ^
-          -DSKIA_DIR=$GITHUB_WORKSPACE/skia/skia ^
-          -DSKIA_LIBRARY_DIR=$GITHUB_WORKSPACE/skia/skia/out/Release-x64 ^
+        cmake -S . -B build -G Ninja ^ 
+          -DCMAKE_BUILD_TYPE=Release ^ 
+          -DLAF_BACKEND=skia ^ 
+          -DSKIA_DIR=$GITHUB_WORKSPACE/skia/skia ^ 
+          -DSKIA_LIBRARY_DIR=$GITHUB_WORKSPACE/skia/skia/out/Release-x64 ^ 
           -DSKIA_LIBRARY=$GITHUB_WORKSPACE/skia/skia/out/Release-x64/skia.lib
 
     - name: Build Aseprite
