@@ -9,28 +9,34 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout source
+    - name: Checkout source code (with submodules)
       uses: actions/checkout@v3
       with:
         submodules: recursive
 
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
+    - name: Setup Git
+      uses: actions/setup-git@v1
+
     - name: Install Dependencies
       shell: bash
-      run: |
-        choco install ninja git cmake 7zip -y
+      run: choco install ninja cmake 7zip -y
 
-    - name: Fetch Skia (official way)
+    - name: Fetch and Build Skia (official method)
       shell: bash
       run: |
+        git config --system core.longpaths true
+
+        echo "Cloning depot_tools..."
         git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
         echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
         export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
-        
+
+        echo "Fetching Skia..."
         mkdir $GITHUB_WORKSPACE/skia
         cd $GITHUB_WORKSPACE/skia
         fetch skia
@@ -38,7 +44,7 @@ jobs:
         bin/gn gen out/Release-x64 --args='is_official_build=true is_component_build=false target_cpu="x64"'
         ninja -C out/Release-x64
 
-    - name: Configure CMake
+    - name: Configure Aseprite with CMake
       shell: bash
       run: |
         cmake -S . -B build -G Ninja ^
@@ -53,7 +59,7 @@ jobs:
       run: |
         cmake --build build --config Release
 
-    - name: Upload Executable
+    - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: aseprite-exe
