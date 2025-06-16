@@ -1,64 +1,60 @@
+name: Build Aseprite with Skia
 
-name: build
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest]
-        build_type: [Release]
-        enable_ui: [on]
-        include:
-          - os: windows-latest
-            build_type: Release
-            enable_ui: on
+    runs-on: windows-latest
+
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout source
+      uses: actions/checkout@v3
       with:
-        submodules: 'recursive'
-    - name: ccache
-      uses: hendrikmuhs/ccache-action@v1
-      if: runner.os == 'Linux'
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        key: ${{ matrix.os }}-${{ matrix.enable_ui }}
-    - uses: seanmiddleditch/gha-setup-ninja@master
-    - uses: ilammy/msvc-dev-cmd@v1
-      if: runner.os == 'Windows'
+        python-version: '3.x'
+
     - name: Install Dependencies
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Linux" ]] ; then
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            libx11-dev libxcursor-dev libxi-dev
-        fi
-    - name: Generating Makefiles
+        choco install ninja git cmake 7zip -y
+
+    - name: Fetch Skia (official way)
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Windows" ]] ; then
-          export enable_ccache=off
-        else
-          export enable_ccache=on
-        fi
-        curl -L https://github.com/blueloveTH/aseprite/releases/download/v0.01/skia.zip --output skia.zip
-        7z x skia.zip
-        cmake -S . -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DENABLE_UI=${{ matrix.enable_ui }} \
-          -DENABLE_CCACHE=$enable_ccache \
-          -DLAF_BACKEND=skia \
-          -DSKIA_DIR=./skia \
-          -DSKIA_LIBRARY_DIR=./skia/out/Release-x64 \
-          -DSKIA_LIBRARY=./skia/out/Release-x64/skia.lib
-    - name: Compiling
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+        echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+        export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+        
+        mkdir $GITHUB_WORKSPACE/skia
+        cd $GITHUB_WORKSPACE/skia
+        fetch skia
+        cd skia
+        bin/gn gen out/Release-x64 --args='is_official_build=true is_component_build=false target_cpu="x64"'
+        ninja -C out/Release-x64
+
+    - name: Configure CMake
       shell: bash
       run: |
-        cd build && ninja
-    - uses: actions/upload-artifact@v4
+        cmake -S . -B build -G Ninja ^
+          -DCMAKE_BUILD_TYPE=Release ^
+          -DLAF_BACKEND=skia ^
+          -DSKIA_DIR=$GITHUB_WORKSPACE/skia/skia ^
+          -DSKIA_LIBRARY_DIR=$GITHUB_WORKSPACE/skia/skia/out/Release-x64 ^
+          -DSKIA_LIBRARY=$GITHUB_WORKSPACE/skia/skia/out/Release-x64/skia.lib
+
+    - name: Build Aseprite
+      shell: bash
+      run: |
+        cmake --build build --config Release
+
+    - name: Upload Executable
+      uses: actions/upload-artifact@v4
       with:
-        name: aseprite
-        path: |
-          D:/a/aseprite/aseprite/build/bin/data
-          D:/a/aseprite/aseprite/build/bin/aseprite.exe
+        name: aseprite-exe
+        path: build/bin/aseprite.exe
